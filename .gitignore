@@ -1,0 +1,6 @@
+﻿# Ignore build artifacts
+intermediate/
+bin/
+*.user
+*.suo
+.vs/
