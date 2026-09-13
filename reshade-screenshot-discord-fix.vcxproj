@@ -32,7 +32,7 @@
   <PropertyGroup>
     <OutDir>bin\$(Platform)\</OutDir>
     <IntDir>intermediate\$(Platform)\</IntDir>
-    <TargetName>DiscordHDRFix</TargetName>
+    <TargetName>screenshot-discord-fix</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Platform)'=='Win32'">
     <TargetExt>.addon32</TargetExt>

@@ -25,8 +25,8 @@ No external scripts or post-save command setups are required!
 
 1. Download the latest release from the [Releases](https://github.com/Jahbanny/reshade-screenshot-discord-fix/releases) tab.
 2. Choose the correct binary for your game:
-   - 64-bit games: `DiscordHDRFix.addon64`
-   - 32-bit games: `DiscordHDRFix.addon32`
+   - 64-bit games: `screenshot-discord-fix.addon64`
+   - 32-bit games: `screenshot-discord-fix.addon32`
 3. Place the `.addon64` (or `.addon32`) file into the same directory as your game's executable (next to ReShade's `.dll` or in your game's folder).
 4. Launch the game. In ReShade's overlay under the **Add-ons** tab, you will see **Discord HDR Fix** enabled.
 
