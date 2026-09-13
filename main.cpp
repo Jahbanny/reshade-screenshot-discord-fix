@@ -17,49 +17,59 @@
 #include <cstdint>
 #include <cstring>   // std::memcmp
 
-// Strips the 16-byte cICP chunk from a PNG file if present
+// Strips the cICP chunk from a PNG file if present.
+// Walks the PNG chunk chain (4-byte length + 4-byte type + data + 4-byte CRC)
+// and copies every chunk except the cICP one, so the result is still a valid PNG.
 static bool strip_cicp_from_png(const std::filesystem::path &filepath)
 {
-	// Read the entire file into memory
-	std::ifstream file(filepath, std::ios::binary | std::ios::ate);
-	if (!file)
+	std::ifstream file(filepath, std::ios::binary);
+	if (!file.is_open())
 		return false;
 
-	const std::streamsize size = file.tellg();
-	file.seekg(0);
+	std::vector<uint8_t> data((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+	file.close();
 
-	std::vector<char> buffer(static_cast<std::size_t>(size));
-	if (!file.read(buffer.data(), size))
+	// Verify the 8-byte PNG signature: 137, 80, 78, 71, 13, 10, 26, 10
+	static const uint8_t png_sig[8] = { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+	if (data.size() < 8 || std::memcmp(data.data(), png_sig, 8) != 0)
 		return false;
 
-	// Find the cICP chunk (signature: 0x00000004 63 49 43 50)
-	const uint32_t cicp_length = 0x00000004;
-	const uint32_t cicp_type   = 0x63494350; // 'cICP'
+	std::vector<uint8_t> new_data;
+	new_data.reserve(data.size());
+	new_data.insert(new_data.end(), data.begin(), data.begin() + 8); // keep the PNG signature
 
-	int cicp_index = -1;
-	for (int i = 0; i + 8 < (int)size; ++i)
+	bool removed = false;
+	std::size_t offset = 8;
+	while (offset + 12 <= data.size())
 	{
-		if (std::memcmp(&buffer[i], &cicp_length, 4) == 0 &&
-			std::memcmp(&buffer[i + 4], &cicp_type, 4) == 0)
-		{
-			cicp_index = i;
+		const uint32_t chunk_len = (static_cast<uint32_t>(data[offset]) << 24) |
+			(static_cast<uint32_t>(data[offset + 1]) << 16) |
+			(static_cast<uint32_t>(data[offset + 2]) << 8) |
+			static_cast<uint32_t>(data[offset + 3]);
+		const std::size_t chunk_total = 12 + chunk_len; // length + type + data + crc
+
+		if (offset + chunk_total > data.size())
+			break; // malformed or truncated chunk; stop here
+
+		const bool is_cicp = std::memcmp(&data[offset + 4], "cICP", 4) == 0;
+		if (is_cicp)
+			removed = true;
+		else
+			new_data.insert(new_data.end(), data.begin() + offset, data.begin() + offset + chunk_total);
+
+		if (std::memcmp(&data[offset + 4], "IEND", 4) == 0)
 			break;
-		}
+
+		offset += chunk_total;
 	}
 
-	if (cicp_index == -1)
+	if (!removed)
+		return false; // no cICP chunk; leave the file untouched
+
+	std::ofstream out_file(filepath, std::ios::binary | std::ios::trunc);
+	if (!out_file.is_open())
 		return false;
-
-	// Remove the 16-byte cICP chunk and rewrite the file
-	std::vector<char> new_buffer;
-	new_buffer.insert(new_buffer.end(), buffer.begin(), buffer.begin() + cicp_index);
-	new_buffer.insert(new_buffer.end(), buffer.begin() + cicp_index + 16, buffer.end());
-
-	std::ofstream out(filepath, std::ios::binary | std::ios::trunc);
-	if (!out)
-		return false;
-
-	out.write(new_buffer.data(), new_buffer.size());
+	out_file.write(reinterpret_cast<const char *>(new_data.data()), static_cast<std::streamsize>(new_data.size()));
 	return true;
 }
 
